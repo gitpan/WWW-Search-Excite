@@ -58,6 +58,10 @@ MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 
 =head1 VERSION HISTORY
 
+=head2 2.16, 2000-11-02
+
+No change in functionality, but parser was totally rewritten using HTML::TreeBuilder
+
 =head2 2.14, 2000-
 
 BUGFIX for missing result-count sometimes;
@@ -150,7 +154,7 @@ use HTML::TreeBuilder;
 use WWW::Search qw( generic_option strip_tags );
 require WWW::SearchResult;
 
-$VERSION = '2.15';
+$VERSION = '2.16';
 $MAINTAINER = 'Martin Thurn <MartinThurn@iname.com>';
 
 # private

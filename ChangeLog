@@ -1,3 +1,11 @@
+2000-11-02  Kingpin  <mthurn@tasc.com>
+
+	* VERSION 2.16 RELEASED
+
+2000-10-30  Kingpin  <mthurn@tasc.com>
+
+	* Excite.pm (native_retrieve_some): REWRITE parser using HTML::TreeBuilder
+
 2000-10-20  Kingpin  <mthurn@tasc.com>
 
 	* Excite.pm (native_retrieve_some): BUGFIX for esoteric result count formats
