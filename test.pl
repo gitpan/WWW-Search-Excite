@@ -28,6 +28,7 @@ print ref($oSearch) ? '' : 'not ';
 print "ok $iTest\n";
 
 use WWW::Search::Test;
+my $debug = 0;
 
 # This test returns no results (but we should not get an HTTP error):
 $iTest++;
@@ -37,40 +38,50 @@ $iResults = scalar(@aoResults);
 print STDOUT (0 < $iResults) ? 'not ' : '';
 print "ok $iTest\n";
 
+# goto MULTI_RESULT;
+
 # This query returns 1 page of results:
 $iTest++;
-$oSearch->native_query(WWW::Search::escape_query('+LS'.'AM +replic'.'ation'));
+$oSearch->native_query(WWW::Search::escape_query('+LS'.'AM +replic'.'ation'),
+                         { 'search_debug' => $debug, },
+                      );
 @aoResults = $oSearch->results();
 $iResults = scalar(@aoResults);
-# print STDERR " + got $iResults results for +LSAM +replication\n";
 if (($iResults < 2) || (49 < $iResults))
   {
+  print STDERR " --- got $iResults results for '+LS","AM +replic","ation', but expected 2..49\n";
   print STDOUT 'not ';
-  print STDERR " --- got $iResults results for 'bunduki', but expected 2..49\n";
   }
 print "ok $iTest\n";
 
 # This query returns 2 pages of results:
 $iTest++;
-$oSearch->native_query(WWW::Search::escape_query('+Thurn +topp'.'s'));
+$oSearch->native_query(WWW::Search::escape_query('+Thu'.'rn +topp'.'s'),
+                         { 'search_debug' => $debug, },
+                      );
 @aoResults = $oSearch->results();
 $iResults = scalar(@aoResults);
-# print STDERR " + got $iResults results for +Thurn +topps\n";
 if (($iResults < 51) || (99 < $iResults))
   {
+  print STDERR " --- got $iResults results for '+Thu","rn +to","pps', but expected 51..99\n";
   print STDOUT 'not ';
-  print STDERR " --- got $iResults results for 'bunduki', but expected 51..99\n";
   }
 print "ok $iTest\n";
 
-# This query returns 1 page of results:
+MULTI_RESULT:
+# $debug = 1;
+
+# This query returns 3 pages of results:
 $iTest++;
-$oSearch->native_query('bundu'.'ki');
+$oSearch->native_query('bundu'.'ki',
+                         { 'search_debug' => $debug, },
+                      );
+$oSearch->maximum_to_retrieve(129);
 @aoResults = $oSearch->results();
 $iResults = scalar(@aoResults);
 if ($iResults < 101)
   {
+  print STDERR " --- got $iResults results for 'bundu","ki', but expected > 101\n";
   print STDOUT 'not ';
-  print STDERR " --- got $iResults results for 'bunduki', but expected > 101\n";
   }
 print "ok $iTest\n";

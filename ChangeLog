@@ -1,4 +1,18 @@
+2000-04-03  Kingpin  <mthurn@tasc.com>
+
+	* VERSION 2.07 RELEASED
+
+2000-03-29  Kingpin  <mthurn@tasc.com>
+
+	* Excite.pm (native_retrieve_some): BUGFIX for sometimes missing header (and getting NO results)
+
+2000-03-03  Kingpin  <mthurn@tasc.com>
+
+	* VERSION 2.06 RELEASED
+	
 2000-03-02  Kingpin  <mthurn@tasc.com>
+
+	* simplified test suite
 
 	* Excite.pm (native_retrieve_some): BUGFIX for bungled next_url
 

@@ -1,7 +1,7 @@
 # Excite.pm
 # by Martin Thurn
 # Copyright (C) 1998 by USC/ISI
-# $Id: Excite.pm,v 1.18 2000/02/28 18:20:38 mthurn Exp mthurn $
+# $Id: Excite.pm,v 1.21 2000/03/29 21:06:10 mthurn Exp $
 
 =head1 NAME
 
@@ -62,6 +62,14 @@ WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
 MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 
 =head1 VERSION HISTORY
+
+=head2 2.07, 2000-03-29
+
+BUGFIX for sometimes missing header (and getting NO results)
+
+=head2 2.06, 2000-03-02
+
+BUGFIX for bungled next_url
 
 =head2 2.05, 2000-02-08
 
@@ -126,7 +134,7 @@ use Carp ();
 use WWW::Search qw( generic_option strip_tags );
 require WWW::SearchResult;
 
-$VERSION = '2.06';
+$VERSION = '2.07';
 $MAINTAINER = 'Martin Thurn <MartinThurn@iname.com>';
 
 # private
@@ -158,6 +166,7 @@ sub native_setup_search
   $native_query =~ s/(\w)\052$/$1\040/g;
   $native_query =~ s/(\w)\0452A\053/$1\053/g;
   $native_query =~ s/(\w)\0452A$/$1/g;
+
   if (!defined($self->{_options})) 
     {
     $self->{_options} = {
@@ -237,7 +246,7 @@ sub native_retrieve_some
       $state = $HITS;
       } # we're in HEADER mode, and line has number of results
     elsif ($state eq $HEADER && 
-           m=^Top\s<b>\d+</b>$=)
+           m=^\s*Top\s<b>\d+</b>\s*$=)
       {
       # Actual line of input is:
       # Top <b>30</b>
