@@ -1,7 +1,7 @@
 # Excite.pm
 # by Martin Thurn
 # Copyright (C) 1998 by USC/ISI
-# $Id: Excite.pm,v 1.32 2000/12/19 15:40:11 mthurn Exp $
+# $Id: Excite.pm,v 1.33 2001/05/17 14:17:36 mthurn Exp $
 
 =head1 NAME
 
@@ -57,6 +57,10 @@ WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
 MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 
 =head1 VERSION HISTORY
+
+=head2 2.17, 2001-05-17
+
+Handle new output format
 
 =head2 2.16, 2000-11-02
 
@@ -154,7 +158,7 @@ use HTML::TreeBuilder;
 use WWW::Search qw( generic_option strip_tags );
 require WWW::SearchResult;
 
-$VERSION = '2.17';
+$VERSION = '2.18';
 $MAINTAINER = 'Martin Thurn <MartinThurn@iname.com>';
 
 # private
@@ -223,7 +227,7 @@ sub native_retrieve_some
 
   # If this is not the first page of results, sleep so as to not overload the server:
   $self->user_agent_delay if 1 < $self->{'_next_to_retrieve'};
-  
+
   # Get some results, adhering to the WWW::Search mechanism:
   print STDERR " *   sending request (",$self->{_next_url},")\n" if $self->{'_debug'};
   my $response = $self->http_request('GET', $self->{_next_url});
@@ -268,21 +272,28 @@ sub native_retrieve_some
     $self->{'_num_hits'}++;
     $hits_found++;
     } # foreach $oLI
-  # See if there is a NEXT button:
-  my @aoFORM = $tree->look_down('_tag', 'form');
-  foreach my $oFORM (@aoFORM)
+  # See if there is a NEXT PAGE link:
+  my @aoSPAN = $tree->look_down('_tag', 'span',
+                                'class' => 'size10',
+                               );
+ SPAN:
+  foreach my $oSPAN (@aoSPAN)
     {
-    my $sForm = $oFORM->as_HTML;
-    print STDERR " + FORM == $sForm" if 1 < $self->{'_debug'};
-    if ($sForm =~ m!&nbsp;Next&nbsp;! || $sForm =~ m!Next Results!i)
+    next unless ref $oSPAN;
+    my $sSPAN = $oSPAN->as_HTML;
+    print STDERR " +   SPAN  == $sSPAN\n" if 1 < $self->{'_debug'};
+    my @aoA = $oSPAN->look_down('_tag', 'a');
+    # The NEXT PAGE link is the last one on the line:
+    my $oA = pop @aoA;
+    next SPAN unless ref $oA;
+    my $sA = $oA->as_text;
+    print STDERR " +   A     == $sA\n" if 1 < $self->{'_debug'};
+    if ($sA =~ m!next page!i)
       {
-      print STDERR " +   FOUND NEXT BUTTON" if 1 < $self->{'_debug'};
-      my $oForm = HTML::Form->parse($sForm, $sBaseURL);
-      my $oNextButton = $oForm->find_input('next');
-      print STDERR " +   NEXT == ", $oNextButton, "\n" if 1 < $self->{'_debug'};
-      $self->{_next_url} = new $HTTP::URI_CLASS($oNextButton->click($oForm)->uri);
+      $self->{_next_url} = new $HTTP::URI_CLASS($oA->attr('href'));
+      last SPAN;
       } # if
-    } # foreach $oFORM
+    } # foreach $oSPAN
   $tree->delete;
   return $hits_found;
   } # native_retrieve_some
