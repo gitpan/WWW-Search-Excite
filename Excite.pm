@@ -1,7 +1,7 @@
 # Excite.pm
 # by Martin Thurn
 # Copyright (C) 1998 by USC/ISI
-# $Id: Excite.pm,v 1.17 2000/02/15 17:20:20 mthurn Exp $
+# $Id: Excite.pm,v 1.18 2000/02/28 18:20:38 mthurn Exp mthurn $
 
 =head1 NAME
 
@@ -126,7 +126,7 @@ use Carp ();
 use WWW::Search qw( generic_option strip_tags );
 require WWW::SearchResult;
 
-$VERSION = '2.05';
+$VERSION = '2.06';
 $MAINTAINER = 'Martin Thurn <MartinThurn@iname.com>';
 
 # private
@@ -299,14 +299,8 @@ sub native_retrieve_some
       # Process the options.
       $self->{'_next_to_retrieve'} += $self->{'_hits_per_page'};
       $self->{'_options'}{'start'} = $self->{'_next_to_retrieve'};
-      my($options) = '';
-      foreach (keys %{$self->{_options}}) 
-        {
-        next if (generic_option($_));
-        $options .= $_ . '=' . $self->{_options}{$_} . '&';
-        }
       # Finally, figure out the url.
-      $self->{_next_url} = $self->{_options}{'search_url'} .'?'. $options;
+      $self->{_next_url} = $self->{_options}{'search_url'} .'?'. $self->hash_to_cgi_string($self->{_options});
       $state = $TRAILER;
       }
 

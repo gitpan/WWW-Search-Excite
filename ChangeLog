@@ -1,5 +1,9 @@
+2000-03-02  Kingpin  <mthurn@tasc.com>
+
+	* Excite.pm (native_retrieve_some): BUGFIX for bungled next_url
+
 Revision history for Perl extension WWW::Search::Excite.
 
-0.01  Fri Jan 28 14:18:09 2000
+2.04  Fri Jan 28 14:18:09 2000
 	- original version; created by h2xs 1.19
 

@@ -8,7 +8,7 @@ use ExtUtils::testlib;
 # Change 1..1 below to 1..last_test_to_print .
 # (It may become useful if the test is moved to ./t subdirectory.)
 
-BEGIN { $| = 1; print "1..8\n"; }
+BEGIN { $| = 1; print "1..6\n"; }
 END {print "not ok 1\n" unless $loaded;}
 use WWW::Search::Excite;
 $loaded = 1;
@@ -26,45 +26,51 @@ my $sEngine = 'Excite';
 my $oSearch = new WWW::Search($sEngine);
 print ref($oSearch) ? '' : 'not ';
 print "ok $iTest\n";
-my $MAINTAINER = $oSearch->maintainer;
 
-# Find out where WebSearch is installed:
-$iTest++;
-my @as = split(/\s/, `WebSearch --VERSION`);
-print $? ? 'not ' : '';
-print "ok $iTest\n";
-my $websearch = shift @as;
-
-$iTest++;
 use WWW::Search::Test;
-my $oTest = new WWW::Search::Test($sEngine);
-$oTest->{websearch} = "$websearch";
-unless (ref($oTest))
+
+# This test returns no results (but we should not get an HTTP error):
+$iTest++;
+$oSearch->native_query($WWW::Search::Test::bogus_query);
+@aoResults = $oSearch->results();
+$iResults = scalar(@aoResults);
+print STDOUT (0 < $iResults) ? 'not ' : '';
+print "ok $iTest\n";
+
+# This query returns 1 page of results:
+$iTest++;
+$oSearch->native_query(WWW::Search::escape_query('+LS'.'AM +replic'.'ation'));
+@aoResults = $oSearch->results();
+$iResults = scalar(@aoResults);
+# print STDERR " + got $iResults results for +LSAM +replication\n";
+if (($iResults < 2) || (49 < $iResults))
   {
-  print "not ok $iTest\n";
-  # Can not continue without Test object:
-  exit 0;
-  } # unless
-print "ok $iTest\n";
-# $oTest->{debug} = 1;
-
-$oTest->mode($MODE_EXTERNAL);
-$iTest++;
-$oTest->test($sEngine, $MAINTAINER, 'zero', $WWW::Search::Test::bogus_query, $TEST_EXACTLY);
-print 0 < $o->{error_count} ? 'not ' : '';
+  print STDOUT 'not ';
+  print STDERR " --- got $iResults results for 'bunduki', but expected 2..49\n";
+  }
 print "ok $iTest\n";
 
+# This query returns 2 pages of results:
 $iTest++;
-$oTest->test($sEngine, $MAINTAINER, 'one', '+LS'.'AM +replic'.'ation', $TEST_RANGE, 2, 49);
-print 0 < $o->{error_count} ? 'not ' : '';
+$oSearch->native_query(WWW::Search::escape_query('+Thurn +topp'.'s'));
+@aoResults = $oSearch->results();
+$iResults = scalar(@aoResults);
+# print STDERR " + got $iResults results for +Thurn +topps\n";
+if (($iResults < 51) || (99 < $iResults))
+  {
+  print STDOUT 'not ';
+  print STDERR " --- got $iResults results for 'bunduki', but expected 51..99\n";
+  }
 print "ok $iTest\n";
 
+# This query returns 1 page of results:
 $iTest++;
-$oTest->test($sEngine, $MAINTAINER, 'two', '+thurn +topp'.'s', $TEST_RANGE, 51, 99);
-print 0 < $o->{error_count} ? 'not ' : '';
-print "ok $iTest\n";
-
-$iTest++;
-$oTest->test($sEngine, $MAINTAINER, 'three', 'bundu'.'ki', $TEST_GREATER_THAN, 101);
-print 0 < $o->{error_count} ? 'not ' : '';
+$oSearch->native_query('bundu'.'ki');
+@aoResults = $oSearch->results();
+$iResults = scalar(@aoResults);
+if ($iResults < 101)
+  {
+  print STDOUT 'not ';
+  print STDERR " --- got $iResults results for 'bunduki', but expected > 101\n";
+  }
 print "ok $iTest\n";
