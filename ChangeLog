@@ -1,3 +1,7 @@
+2000-06-19  Kingpin  <mthurn@tasc.com>
+
+	* Excite.pm (native_retrieve_some): handle new output format
+
 2000-05-26  Kingpin  <mthurn@tasc.com>
 
 	* Excite.pm: make sure summaries are on (but parse correctly even if they're not)

@@ -1,7 +1,7 @@
 # Excite.pm
 # by Martin Thurn
 # Copyright (C) 1998 by USC/ISI
-# $Id: Excite.pm,v 1.23 2000/05/27 03:07:17 mthurn Exp $
+# $Id: Excite.pm,v 1.24 2000/06/19 14:47:03 mthurn Exp $
 
 =head1 NAME
 
@@ -134,7 +134,7 @@ use Carp ();
 use WWW::Search qw( generic_option strip_tags );
 require WWW::SearchResult;
 
-$VERSION = '2.08';
+$VERSION = '2.09';
 $MAINTAINER = 'Martin Thurn <MartinThurn@iname.com>';
 
 # private
@@ -216,7 +216,8 @@ sub native_retrieve_some
   print STDERR " *   got response\n" if $self->{'_debug'};
   $self->{'_next_url'} = undef;
   # Parse the output
-  my ($HEADER, $HITS, $URL, $DESC, $TRAILER) = qw( HE HH UR DE TR );
+  my ($HEADER, $HITS, $URL, $DESC, $DESC2, $TRAILER, $SKIP1, $SKIP2, 
+      $SKIP3) = qw( HE HH UR DE D2 TR S1 S2 S3 );
   my $hits_found = 0;
   my $state = $HEADER;
   my $hit;
@@ -235,22 +236,26 @@ sub native_retrieve_some
       $state = $HITS;
       } # we're in HEADER mode, and line has number of results
     elsif ($state eq $HEADER && 
-           m=^\s*(\240|&nbsp;)?\d+-(\d+)\s*$=)
+           (m=^\s*(?:\240|&nbsp;)?\d+-(\d+)\s*$=
+            ||
+            m!\AWeb\sSite\sResults\s\d+-(\d+)\sfor:!))
       {
       # Actual line of input is:
       #  11-20
+      # Web Site Results 1-22 for: <b>+LSAM +replication</b>
       print STDERR "header line (second/only page)\n" if 2 <= $self->{'_debug'};
       unless (defined($self->approximate_result_count) and 0 < $self->approximate_result_count)
         {
-        $self->approximate_result_count($2);
+        $self->approximate_result_count($1);
         } # unless
       $state = $HITS;
       } # we're in HEADER mode, and line has number of results
     elsif ($state eq $HEADER && 
-           m=^\s*Top\s<b>\d+</b>\s*$=)
+           m=^\s*Top\s+(<b>)?\d+(</b>)?\s*(Web\s+Site)?$=)
       {
       # Actual line of input is:
       # Top <b>30</b>
+      # Top 50 Web Site
       print STDERR "header line (no count)\n" if 2 <= $self->{'_debug'};
       $state = $HITS;
       } # we're in HEADER mode, and line has number of results
@@ -266,14 +271,16 @@ sub native_retrieve_some
       } # in HITS mode, saw percentage line
 
     elsif ($state eq $HITS && 
-           m!\A(?:<p>\s*)?\<A\s+HREF=\"[^\";]+?;([^\"]+)\">([^\<]+)!i)
+           m!\A(?:<(?:p|li)>\s*)?\<A\s+HREF=\"[^\";]+?;([^\"]+)\">([^\<]+)!i
+          )
       {
       print STDERR "hit url line\n" if 2 <= $self->{'_debug'};
-      # Actual line of input:
+      # Actual lines of input:
       # <A HREF="http://buteo.colorado.edu/~yosh/psi/system2/aliens/greedo/">Greedo</A>&nbsp;
       # <p> <A HREF="http://search.excite.com/relocate/sr=webresult|ss=pikamew|id=1265183;http://www.geocities.com/TimesSquare/Corridor/2509/geobook.html">Charmeleon's Guestbook</A>&nbsp;
       # Sometimes the </A> is on the next line.
       # Sometimes there is a /r right before the </A>
+      # <li> <A HREF="http://search.excite.com/relocate/sr=webresult|ss=Martin+Thurn|id=34046238;http://www.planethalflife.com/radium/sp_reviews/assassin.shtml">|-r a d i u m-|&nbsp;&nbsp;&nbsp;&nbsp;The Half Life Map Center</A>
       if (ref($hit) && $hit->url)
         {
         push(@{$self->{cache}}, $hit);
@@ -284,6 +291,30 @@ sub native_retrieve_some
       $hit->add_url($1);
       $hit->title(strip_tags($2));
       $state = $DESC;
+      $state = $SKIP1 if m!<li>!i;
+      }
+
+    elsif ($state eq $SKIP1)
+      {
+      print STDERR "skip1\n" if 2 <= $self->{'_debug'};
+      $state = $SKIP2;
+      }
+    elsif ($state eq $SKIP2)
+      {
+      print STDERR "skip2\n" if 2 <= $self->{'_debug'};
+      $state = $SKIP3;
+      }
+    elsif ($state eq $SKIP3)
+      {
+      print STDERR "skip3\n" if 2 <= $self->{'_debug'};
+      $state = $DESC2;
+      $state = $HITS if m!</li>!;
+      }
+    elsif ($state eq $DESC2)
+      {
+      print STDERR "desc2\n" if 2 <= $self->{'_debug'};
+      $hit->description(strip_tags($_));
+      $state = $HITS;
       }
 
     elsif ($state eq $DESC && m/^<BR>$/)
