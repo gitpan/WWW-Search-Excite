@@ -1,7 +1,7 @@
 # Excite.pm
 # by Martin Thurn
 # Copyright (C) 1998 by USC/ISI
-# $Id: Excite.pm,v 1.25 2000/09/05 13:19:59 mthurn Exp mthurn $
+# $Id: Excite.pm,v 1.28 2000/10/10 12:59:55 mthurn Exp $
 
 =head1 NAME
 
@@ -58,9 +58,15 @@ MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 
 =head1 VERSION HISTORY
 
+=head2 2.13, 2000-10-10
+
+BUGFIX for missing result-count sometimes;
+BUGFIX for missing END of results;
+BUGFIX for mis-parsing URLs
+
 =head2 2.12, 2000-09-18
 
-BUGFIX for still missing the count of results;
+BUGFIX for still missing the result-count;
 BUGFIX for missing all results sometimes
 
 =head2 2.11, 2000-09-05
@@ -138,7 +144,7 @@ use Carp ();
 use WWW::Search qw( generic_option strip_tags );
 require WWW::SearchResult;
 
-$VERSION = '2.12';
+$VERSION = '2.13';
 $MAINTAINER = 'Martin Thurn <MartinThurn@iname.com>';
 
 # private
@@ -220,8 +226,8 @@ sub native_retrieve_some
   print STDERR " *   got response\n" if $self->{'_debug'};
   $self->{'_next_url'} = undef;
   # Parse the output
-  my ($HEADER, $HITS, $URL, $DESC, $DESC2, $TRAILER, $SKIP1, $SKIP2, 
-      $SKIP3) = qw( HE HH UR DE D2 TR S1 S2 S3 );
+  my ($HEADER, $HITS, $URL, $DESC, $DESC2, $NEXT, $TRAILER, $SKIP1, $SKIP2, 
+      $SKIP3) = qw( HE HH UR DE D2 NE TR S1 S2 S3 );
   my $hits_found = 0;
   my $state = $HEADER;
   my $hit;
@@ -247,12 +253,13 @@ sub native_retrieve_some
             ||
             m!\AResults\sof\sabout\s([0-9,]+)\sfor:!
             ||
-            m!\AWeb\sSite\sResults\s\d+-\d+\sof\sabout\s([0-9,]+)\sfor:!))
+            m!\AWeb\sSite\sResults\s\d+-\d+\sof\s(?:about\s)?([0-9,]+)\sfor:!))
       {
-      # Actual line of input is:
+      # Actual lines of input are:
       #  11-20
       # Web Site Results 1-22 for: <b>+LSAM +replication</b>
       # Web Site Results 1-46 of about 46 for: <b>+LSAM +replication</b>
+      # Web Site Results 1-41 of 41 for: <b>+LSAM +replication</b>
       # Web Site Results 51-100 of about 52,700 for: <b>pikachu</b>
       # Results of about 52,700 for: <b>pikachu</b>
       print STDERR "header line (second/only page)\n" if 2 <= $self->{'_debug'};
@@ -276,7 +283,7 @@ sub native_retrieve_some
       } # in HITS mode, saw percentage line
 
     elsif ($state eq $HITS && 
-           m!\A(?:<(?:p|li)>\s*)?\<A\s+HREF=\"[^\";]+?;([^\"]+)\">([^\<]+)!i
+           m!\A(?:<(?:p|li)>\s*)?\<A\s+HREF=\"[^\";]+?;(?:pos=\d+;)?([^\"]+)\">([^\<]+)!i
           )
       {
       print STDERR "hit url line\n" if 2 <= $self->{'_debug'};
@@ -286,6 +293,7 @@ sub native_retrieve_some
       # Sometimes the </A> is on the next line.
       # Sometimes there is a /r right before the </A>
       # <li> <A HREF="http://search.excite.com/relocate/sr=webresult|ss=Martin+Thurn|id=34046238;http://www.planethalflife.com/radium/sp_reviews/assassin.shtml">|-r a d i u m-|&nbsp;&nbsp;&nbsp;&nbsp;The Half Life Map Center</A>
+      my ($sURL, $sTitle) = ($1, $2);
       if (ref($hit) && $hit->url)
         {
         push(@{$self->{cache}}, $hit);
@@ -293,8 +301,8 @@ sub native_retrieve_some
       $hit = new WWW::SearchResult;
       $self->{'_num_hits'}++;
       $hits_found++;
-      $hit->add_url($1);
-      $hit->title(strip_tags($2));
+      $hit->add_url($sURL);
+      $hit->title(strip_tags($sTitle));
       $state = $DESC;
       $state = $SKIP1 if m!<li>!i;
       }
@@ -345,7 +353,28 @@ sub native_retrieve_some
     #   print STDERR " end of URL list\n" if 2 <= $self->{'_debug'};
     #   $state = $TRAILER;
     #   }
-    elsif ((($state eq $HITS) || ($state eq $TRAILER)) &&
+    elsif ( ($state eq $HITS) && m/<INPUT\s[^>]*VALUE=\"Previous\sResults\"/i )
+      {
+      # Actual line of input:
+      # <INPUT TYPE=submit NAME=prev VALUE="Previous Results">
+      print STDERR " previous button\n" if 2 <= $self->{'_debug'};
+      # We need to look for this, so that on the LAST page of results
+      # (which has no "Next" button), we get out of the $HITS state.
+      $state = $NEXT;
+      }
+    elsif ( ($state eq $HITS) && m!<FORM\s+ACTION=\"/search\.gw\"!i)
+      {
+      # Actual line of input:
+      # <FORM ACTION="/search.gw" METHOD=GET>
+      print STDERR " found search form\n" if 2 <= $self->{'_debug'};
+      # We need to look for this, so that on the ONLY page of results
+      # (which has no "Previous" and no "Next" button), we get out of
+      # the $HITS state.
+      $state = $NEXT;
+      }
+    elsif ((($state eq $HITS) ||
+            ($state eq $TRAILER) ||
+            ($state eq $NEXT)) &&
            m/<INPUT\s[^>]*VALUE=\"Next\sResults\"/i)
       {
       # Actual lines of input include:

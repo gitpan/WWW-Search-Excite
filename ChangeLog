@@ -1,3 +1,11 @@
+2000-10-10  Kingpin  <mthurn@tasc.com>
+
+	* Excite.pm (native_retrieve_some): BUGFIX for missing count sometimes
+
+2000-09-26  Kingpin  <mthurn@tasc.com>
+
+	* Excite.pm (native_retrieve_some): BUGFIX for missing END of results; BUGFIX for mis-parsing URLs
+
 2000-09-19
 
 	* VERSION 2.12 RELEASED

@@ -60,7 +60,7 @@ goto MULTI_RESULT;
 
 # This query returns 2 pages of results:
 $iTest++;
-$sQuery = 'pikamew';
+$sQuery = 'li'.'zardon';
 $oSearch->native_query(WWW::Search::escape_query($sQuery),
                          { 'search_debug' => $debug, },
                       );
@@ -78,11 +78,11 @@ MULTI_RESULT:
 
 # This query returns 3 pages of results:
 $iTest++;
-$sQuery = 'pikachu';
+$sQuery = 'pikamew';
 $oSearch->native_query($sQuery,
                          { 'search_debug' => $debug, },
                       );
-$oSearch->maximum_to_retrieve(129);
+# $oSearch->maximum_to_retrieve(129);
 @aoResults = $oSearch->results();
 $iResults = scalar(@aoResults);
 if ($iResults < 101)
