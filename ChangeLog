@@ -1,6 +1,10 @@
+2000-09-05  Kingpin  <mthurn@tasc.com>
+
+	* Excite.pm (native_retrieve_some): parse new excite.com headers
+
 2000-06-19  Kingpin  <mthurn@tasc.com>
 
-	* Excite.pm (native_retrieve_some): handle new output format
+	* Excite.pm (native_retrieve_some): parse new excite.com output format
 
 2000-05-26  Kingpin  <mthurn@tasc.com>
 

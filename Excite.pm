@@ -1,7 +1,7 @@
 # Excite.pm
 # by Martin Thurn
 # Copyright (C) 1998 by USC/ISI
-# $Id: Excite.pm,v 1.24 2000/06/19 14:47:03 mthurn Exp $
+# $Id: Excite.pm,v 1.25 2000/09/05 13:19:59 mthurn Exp $
 
 =head1 NAME
 
@@ -62,6 +62,10 @@ WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
 MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 
 =head1 VERSION HISTORY
+
+=head2 2.11, 2000-09-05
+
+BUGFIX for still missing some header formats
 
 =head2 2.07, 2000-03-29
 
@@ -134,7 +138,7 @@ use Carp ();
 use WWW::Search qw( generic_option strip_tags );
 require WWW::SearchResult;
 
-$VERSION = '2.09';
+$VERSION = '2.11';
 $MAINTAINER = 'Martin Thurn <MartinThurn@iname.com>';
 
 # private
@@ -221,7 +225,8 @@ sub native_retrieve_some
   my $hits_found = 0;
   my $state = $HEADER;
   my $hit;
-  foreach ($self->split_lines($response->content())) 
+ LINE_OF_INPUT:
+  foreach ($self->split_lines($response->content()))
     {
     next if m/^$/; # short circuit for blank lines
     print STDERR " *   $state ===$_===" if 2 <= $self->{'_debug'};
@@ -238,15 +243,21 @@ sub native_retrieve_some
     elsif ($state eq $HEADER && 
            (m=^\s*(?:\240|&nbsp;)?\d+-(\d+)\s*$=
             ||
-            m!\AWeb\sSite\sResults\s\d+-(\d+)\sfor:!))
+            m!\AWeb\sSite\sResults\s\d+-(\d+)\sfor:!
+            ||
+            m!\AWeb\sSite\sResults\s\d+-\d+\sof\sabout\s([0-9,]+)\sfor:!))
       {
       # Actual line of input is:
       #  11-20
       # Web Site Results 1-22 for: <b>+LSAM +replication</b>
+      # Web Site Results 1-46 of about 46 for: <b>+LSAM +replication</b>
+      # Web Site Results 51-100 of about 52,700 for: <b>pikachu</b>
       print STDERR "header line (second/only page)\n" if 2 <= $self->{'_debug'};
+      my $iCount = $1;
+      $iCount =~ s!,!!g;
       unless (defined($self->approximate_result_count) and 0 < $self->approximate_result_count)
         {
-        $self->approximate_result_count($1);
+        $self->approximate_result_count($iCount);
         } # unless
       $state = $HITS;
       } # we're in HEADER mode, and line has number of results
@@ -335,6 +346,12 @@ sub native_retrieve_some
       } # line is description
 
     elsif ($state eq $HITS &&
+           m/>\s*Show Titles Only\s*</i)
+      {
+      print STDERR " end of URL list\n" if 2 <= $self->{'_debug'};
+      $state = $TRAILER;
+      }
+    elsif ((($state eq $HITS) || ($state eq $TRAILER)) &&
            m/<INPUT\s[^>]*VALUE=\"Next\sResults\"/i)
       {
       # Actual lines of input include:
@@ -349,6 +366,7 @@ sub native_retrieve_some
       # Finally, figure out the url.
       $self->{_next_url} = $self->{_options}{'search_url'} .'?'. $self->hash_to_cgi_string($self->{_options});
       $state = $TRAILER;
+      last LINE_OF_INPUT;
       }
 
     else
