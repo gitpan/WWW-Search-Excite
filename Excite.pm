@@ -1,7 +1,7 @@
 # Excite.pm
 # by Martin Thurn
 # Copyright (C) 1998 by USC/ISI
-# $Id: Excite.pm,v 1.28 2000/10/10 12:59:55 mthurn Exp $
+# $Id: Excite.pm,v 1.30 2000/10/27 14:50:26 mthurn Exp mthurn $
 
 =head1 NAME
 
@@ -57,6 +57,10 @@ WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
 MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 
 =head1 VERSION HISTORY
+
+=head2 2.14, 2000-
+
+BUGFIX for missing result-count sometimes;
 
 =head2 2.13, 2000-10-10
 
@@ -141,10 +145,12 @@ require Exporter;
 @ISA = qw(WWW::Search Exporter);
 
 use Carp ();
+use HTML::Form;
+use HTML::TreeBuilder;
 use WWW::Search qw( generic_option strip_tags );
 require WWW::SearchResult;
 
-$VERSION = '2.13';
+$VERSION = '2.15';
 $MAINTAINER = 'Martin Thurn <MartinThurn@iname.com>';
 
 # private
@@ -207,10 +213,10 @@ sub native_setup_search
 sub native_retrieve_some
   {
   my ($self) = @_;
-  
+
   # Fast exit if already done:
   return undef unless defined($self->{_next_url});
-  
+
   # If this is not the first page of results, sleep so as to not overload the server:
   $self->user_agent_delay if 1 < $self->{'_next_to_retrieve'};
   
@@ -218,196 +224,60 @@ sub native_retrieve_some
   print STDERR " *   sending request (",$self->{_next_url},")\n" if $self->{'_debug'};
   my $response = $self->http_request('GET', $self->{_next_url});
   $self->{response} = $response;
-  unless ($response->is_success) 
+  unless ($response->is_success)
     {
     return undef;
     }
 
   print STDERR " *   got response\n" if $self->{'_debug'};
+  my $sBaseURL = $self->{'_next_url'};
   $self->{'_next_url'} = undef;
-  # Parse the output
-  my ($HEADER, $HITS, $URL, $DESC, $DESC2, $NEXT, $TRAILER, $SKIP1, $SKIP2, 
-      $SKIP3) = qw( HE HH UR DE D2 NE TR S1 S2 S3 );
-  my $hits_found = 0;
-  my $state = $HEADER;
-  my $hit;
- LINE_OF_INPUT:
-  foreach ($self->split_lines($response->content()))
+
+  # Parse the output:
+  my $tree = new HTML::TreeBuilder;
+  $tree->parse($response->content);
+  $tree->eof;
+
+  # Each URL result is in a <LI> tag:
+  my @aoLI = $tree->look_down('_tag', 'li');
+  foreach my $oLI (@aoLI)
     {
-    next if m/^$/; # short circuit for blank lines
-    print STDERR " *   $state ===$_===" if 2 <= $self->{'_debug'};
-
-    if ($state eq $HEADER && 
-        m=^\[(\d+)\s+hits.=)
-      {
-      # Actual line of input is:
-      # [9000 hits. About Your Results]</i></a></small>
-      print STDERR "header line (first page)\n" if 2 <= $self->{'_debug'};
-      $self->approximate_result_count($1);
-      $state = $HITS;
-      } # we're in HEADER mode, and line has number of results
-    elsif ($state eq $HEADER && 
-           (m=^\s*(?:\240|&nbsp;)?\d+-(\d+)\s*$=
-            ||
-            m!\AWeb\sSite\sResults\s\d+-(\d+)\sfor:!
-            ||
-            m!\AResults\sof\sabout\s([0-9,]+)\sfor:!
-            ||
-            m!\AWeb\sSite\sResults\s\d+-\d+\sof\s(?:about\s)?([0-9,]+)\sfor:!))
-      {
-      # Actual lines of input are:
-      #  11-20
-      # Web Site Results 1-22 for: <b>+LSAM +replication</b>
-      # Web Site Results 1-46 of about 46 for: <b>+LSAM +replication</b>
-      # Web Site Results 1-41 of 41 for: <b>+LSAM +replication</b>
-      # Web Site Results 51-100 of about 52,700 for: <b>pikachu</b>
-      # Results of about 52,700 for: <b>pikachu</b>
-      print STDERR "header line (second/only page)\n" if 2 <= $self->{'_debug'};
-      my $iCount = $1;
-      $iCount =~ s!,!!g;
-      unless (defined($self->approximate_result_count) and 0 < $self->approximate_result_count)
-        {
-        $self->approximate_result_count($iCount);
-        } # unless
-      $state = $HITS;
-      } # we're in HEADER mode, and line has number of results
-
-    elsif ($state eq $HITS && 
-           m=\<SMALL>(\d+)\%=i)
-      {
-      print STDERR "hit percentage line\n" if 2 <= $self->{'_debug'};
-      # Actual line of input:
-      # <SMALL>92% </SMALL>
-      $hit->score($1);
-      $state = $URL;
-      } # in HITS mode, saw percentage line
-
-    elsif ($state eq $HITS && 
-           m!\A(?:<(?:p|li)>\s*)?\<A\s+HREF=\"[^\";]+?;(?:pos=\d+;)?([^\"]+)\">([^\<]+)!i
-          )
-      {
-      print STDERR "hit url line\n" if 2 <= $self->{'_debug'};
-      # Actual lines of input:
-      # <A HREF="http://buteo.colorado.edu/~yosh/psi/system2/aliens/greedo/">Greedo</A>&nbsp;
-      # <p> <A HREF="http://search.excite.com/relocate/sr=webresult|ss=pikamew|id=1265183;http://www.geocities.com/TimesSquare/Corridor/2509/geobook.html">Charmeleon's Guestbook</A>&nbsp;
-      # Sometimes the </A> is on the next line.
-      # Sometimes there is a /r right before the </A>
-      # <li> <A HREF="http://search.excite.com/relocate/sr=webresult|ss=Martin+Thurn|id=34046238;http://www.planethalflife.com/radium/sp_reviews/assassin.shtml">|-r a d i u m-|&nbsp;&nbsp;&nbsp;&nbsp;The Half Life Map Center</A>
-      my ($sURL, $sTitle) = ($1, $2);
-      if (ref($hit) && $hit->url)
-        {
-        push(@{$self->{cache}}, $hit);
-        }
-      $hit = new WWW::SearchResult;
-      $self->{'_num_hits'}++;
-      $hits_found++;
-      $hit->add_url($sURL);
-      $hit->title(strip_tags($sTitle));
-      $state = $DESC;
-      $state = $SKIP1 if m!<li>!i;
-      }
-
-    elsif ($state eq $SKIP1)
-      {
-      print STDERR "skip1\n" if 2 <= $self->{'_debug'};
-      $state = $SKIP2;
-      }
-    elsif ($state eq $SKIP2)
-      {
-      print STDERR "skip2\n" if 2 <= $self->{'_debug'};
-      $state = $SKIP3;
-      }
-    elsif ($state eq $SKIP3)
-      {
-      print STDERR "skip3\n" if 2 <= $self->{'_debug'};
-      $state = $DESC2;
-      $state = $HITS if m!</li>!;
-      }
-    elsif ($state eq $DESC2)
-      {
-      print STDERR "desc2\n" if 2 <= $self->{'_debug'};
-      $hit->description(strip_tags($_));
-      $state = $HITS;
-      }
-
-    elsif ($state eq $DESC && m/^<BR>$/)
-      {
-      print STDERR "no desc\n" if 2 <= $self->{'_debug'};
-      $state = $HITS;
-      }
-    elsif ($state eq $DESC &&
-           (m/^\-\s(.+?)<BR>/ || m/^\-\s(.+)$/)
-          )
-      {
-      print STDERR "hit description line\n" if 2 <= $self->{'_debug'};
-      # Actual line of input:
-      # - Bootlegs Maintained by Gus Lopez (lopez@halcyon.com) Bootlegs toys and other Star Wars collectibles were made primarily in countries where Star Wars was not commercially released in theaters. Most Star Wars bootlegs originate from the eastern bloc countries: Poland, Hungary, and Russia. <BR><SMALL>http://www.toysrgus.com/images-bootleg.html
-      # (The description ends when we see <BR>, or goes to end-of-line if there is no <BR>
-      $hit->description(strip_tags($1));
-      $state = $HITS;
-      } # line is description
-
-    # elsif ($state eq $HITS &&
-    #        m/>\s*Show Titles Only\s*</i)
-    #   {
-    #   print STDERR " end of URL list\n" if 2 <= $self->{'_debug'};
-    #   $state = $TRAILER;
-    #   }
-    elsif ( ($state eq $HITS) && m/<INPUT\s[^>]*VALUE=\"Previous\sResults\"/i )
-      {
-      # Actual line of input:
-      # <INPUT TYPE=submit NAME=prev VALUE="Previous Results">
-      print STDERR " previous button\n" if 2 <= $self->{'_debug'};
-      # We need to look for this, so that on the LAST page of results
-      # (which has no "Next" button), we get out of the $HITS state.
-      $state = $NEXT;
-      }
-    elsif ( ($state eq $HITS) && m!<FORM\s+ACTION=\"/search\.gw\"!i)
-      {
-      # Actual line of input:
-      # <FORM ACTION="/search.gw" METHOD=GET>
-      print STDERR " found search form\n" if 2 <= $self->{'_debug'};
-      # We need to look for this, so that on the ONLY page of results
-      # (which has no "Previous" and no "Next" button), we get out of
-      # the $HITS state.
-      $state = $NEXT;
-      }
-    elsif ((($state eq $HITS) ||
-            ($state eq $TRAILER) ||
-            ($state eq $NEXT)) &&
-           m/<INPUT\s[^>]*VALUE=\"Next\sResults\"/i)
-      {
-      # Actual lines of input include:
-      # <INPUT TYPE=submit NAME=next VALUE="Next Results">
-      # <input value="Next Results" type="submit" name="next">
-      print STDERR " found next button\n" if 2 <= $self->{'_debug'};
-      # There is a "next" button on this page, therefore there are
-      # indeed more results for us to go after next time.
-      # Process the options.
-      $self->{'_next_to_retrieve'} += $self->{'_hits_per_page'};
-      $self->{'_options'}{'start'} = $self->{'_next_to_retrieve'};
-      # Finally, figure out the url.
-      $self->{_next_url} = $self->{_options}{'search_url'} .'?'. $self->hash_to_cgi_string($self->{_options});
-      $state = $TRAILER;
-      last LINE_OF_INPUT;
-      }
-
-    else
-      {
-      print STDERR "didn't match\n" if 2 <= $self->{'_debug'};
-      }
-    } # foreach line of query results HTML page
-
-  if ($state ne $TRAILER)
-    {
-    # End, no other pages (missed some tag somewhere along the line?)
-    $self->{_next_url} = undef;
-    }
-  if (ref($hit)) 
-    {
+    # print STDERR " + LI == ", $oLI->as_HTML;
+    my $oA = $oLI->look_down('_tag', 'a');
+    next unless ref($oA);
+    my $sURL = $oA->attr('href');
+    $sURL =~ s!\A.+?;pos=\d+;!!;
+    # print STDERR " +   URL   == $sURL\n";
+    my $sTitle = $oA->as_text;
+    # print STDERR " +   TITLE == $sTitle\n";
+    # The last <font> tag contains the description:
+    my @aoFONT = $oLI->look_down('_tag', 'font');
+    $oFONT = $aoFONT[-1];
+    next unless ref($oFONT);
+    my $sDesc = $oFONT->as_text;
+    # print STDERR " +   DESC  == $sDesc\n";
+    my $hit = new WWW::SearchResult;
+    $hit->add_url($sURL);
+    $hit->title($sTitle);
+    $hit->description($sDesc);
     push(@{$self->{cache}}, $hit);
-    }
-  
+    $self->{'_num_hits'}++;
+    $hits_found++;
+    } # foreach $oLI
+  # See if there is a NEXT button:
+  my @aoFORM = $tree->look_down('_tag', 'form');
+  foreach my $oFORM (@aoFORM)
+    {
+    my $sForm = $oFORM->as_HTML;
+    if ($sForm =~ m!Next Results!i)
+      {
+      print STDERR " + FORM == $sForm" if 1 < $self->{'_debug'};
+      my $oForm = HTML::Form->parse($sForm, $sBaseURL);
+      my $oNextButton = $oForm->find_input('next');
+      print STDERR " +   NEXT == ", $oNextButton, "\n" if 1 < $self->{'_debug'};
+      $self->{_next_url} = new $HTTP::URI_CLASS($oNextButton->click($oForm)->uri);
+      } # if
+    } # foreach $oFORM
   return $hits_found;
   } # native_retrieve_some
 

@@ -1,3 +1,7 @@
+2000-10-20  Kingpin  <mthurn@tasc.com>
+
+	* Excite.pm (native_retrieve_some): BUGFIX for esoteric result count formats
+
 2000-10-10  Kingpin  <mthurn@tasc.com>
 
 	* Excite.pm (native_retrieve_some): BUGFIX for missing count sometimes
