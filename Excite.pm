@@ -1,7 +1,7 @@
 # Excite.pm
 # by Martin Thurn
 # Copyright (C) 1998 by USC/ISI
-# $Id: Excite.pm,v 1.30 2000/10/27 14:50:26 mthurn Exp mthurn $
+# $Id: Excite.pm,v 1.32 2000/12/19 15:40:11 mthurn Exp $
 
 =head1 NAME
 
@@ -154,7 +154,7 @@ use HTML::TreeBuilder;
 use WWW::Search qw( generic_option strip_tags );
 require WWW::SearchResult;
 
-$VERSION = '2.16';
+$VERSION = '2.17';
 $MAINTAINER = 'Martin Thurn <MartinThurn@iname.com>';
 
 # private
@@ -246,20 +246,20 @@ sub native_retrieve_some
   my @aoLI = $tree->look_down('_tag', 'li');
   foreach my $oLI (@aoLI)
     {
-    # print STDERR " + LI == ", $oLI->as_HTML;
+    print STDERR " + LI == ", $oLI->as_HTML if 1 < $self->{'_debug'};
     my $oA = $oLI->look_down('_tag', 'a');
     next unless ref($oA);
     my $sURL = $oA->attr('href');
     $sURL =~ s!\A.+?;pos=\d+;!!;
-    # print STDERR " +   URL   == $sURL\n";
+    # print STDERR " +   URL   == $sURL\n" if 1 < $self->{'_debug'};
     my $sTitle = $oA->as_text;
-    # print STDERR " +   TITLE == $sTitle\n";
-    # The last <font> tag contains the description:
-    my @aoFONT = $oLI->look_down('_tag', 'font');
+    # print STDERR " +   TITLE == $sTitle\n" if 1 < $self->{'_debug'};
+    # The last <span> tag contains the description:
+    my @aoFONT = $oLI->look_down('_tag', 'span');
     $oFONT = $aoFONT[-1];
     next unless ref($oFONT);
     my $sDesc = $oFONT->as_text;
-    # print STDERR " +   DESC  == $sDesc\n";
+    # print STDERR " +   DESC  == $sDesc\n" if 1 < $self->{'_debug'};
     my $hit = new WWW::SearchResult;
     $hit->add_url($sURL);
     $hit->title($sTitle);
@@ -273,15 +273,17 @@ sub native_retrieve_some
   foreach my $oFORM (@aoFORM)
     {
     my $sForm = $oFORM->as_HTML;
-    if ($sForm =~ m!Next Results!i)
+    print STDERR " + FORM == $sForm" if 1 < $self->{'_debug'};
+    if ($sForm =~ m!&nbsp;Next&nbsp;! || $sForm =~ m!Next Results!i)
       {
-      print STDERR " + FORM == $sForm" if 1 < $self->{'_debug'};
+      print STDERR " +   FOUND NEXT BUTTON" if 1 < $self->{'_debug'};
       my $oForm = HTML::Form->parse($sForm, $sBaseURL);
       my $oNextButton = $oForm->find_input('next');
       print STDERR " +   NEXT == ", $oNextButton, "\n" if 1 < $self->{'_debug'};
       $self->{_next_url} = new $HTTP::URI_CLASS($oNextButton->click($oForm)->uri);
       } # if
     } # foreach $oFORM
+  $tree->delete;
   return $hits_found;
   } # native_retrieve_some
 
