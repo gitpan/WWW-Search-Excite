@@ -1,7 +1,7 @@
 # Excite.pm
 # by Martin Thurn
 # Copyright (C) 1998 by USC/ISI
-# $Id: Excite.pm,v 1.25 2000/09/05 13:19:59 mthurn Exp $
+# $Id: Excite.pm,v 1.25 2000/09/05 13:19:59 mthurn Exp mthurn $
 
 =head1 NAME
 
@@ -42,11 +42,6 @@ Ignores all other sections of Excite's query results.
 
 Please tell the author if you find any!
 
-=head1 TESTING
-
-This module adheres to the C<WWW::Search> test suite mechanism. 
-See the value of $TEST_CASES below.
-
 =head1 AUTHOR
 
 As of 1998-03-23, C<WWW::Search::Excite> is maintained by Martin Thurn
@@ -62,6 +57,11 @@ WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
 MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 
 =head1 VERSION HISTORY
+
+=head2 2.12, 2000-09-18
+
+BUGFIX for still missing the count of results;
+BUGFIX for missing all results sometimes
 
 =head2 2.11, 2000-09-05
 
@@ -138,7 +138,7 @@ use Carp ();
 use WWW::Search qw( generic_option strip_tags );
 require WWW::SearchResult;
 
-$VERSION = '2.11';
+$VERSION = '2.12';
 $MAINTAINER = 'Martin Thurn <MartinThurn@iname.com>';
 
 # private
@@ -245,6 +245,8 @@ sub native_retrieve_some
             ||
             m!\AWeb\sSite\sResults\s\d+-(\d+)\sfor:!
             ||
+            m!\AResults\sof\sabout\s([0-9,]+)\sfor:!
+            ||
             m!\AWeb\sSite\sResults\s\d+-\d+\sof\sabout\s([0-9,]+)\sfor:!))
       {
       # Actual line of input is:
@@ -252,6 +254,7 @@ sub native_retrieve_some
       # Web Site Results 1-22 for: <b>+LSAM +replication</b>
       # Web Site Results 1-46 of about 46 for: <b>+LSAM +replication</b>
       # Web Site Results 51-100 of about 52,700 for: <b>pikachu</b>
+      # Results of about 52,700 for: <b>pikachu</b>
       print STDERR "header line (second/only page)\n" if 2 <= $self->{'_debug'};
       my $iCount = $1;
       $iCount =~ s!,!!g;
@@ -259,15 +262,6 @@ sub native_retrieve_some
         {
         $self->approximate_result_count($iCount);
         } # unless
-      $state = $HITS;
-      } # we're in HEADER mode, and line has number of results
-    elsif ($state eq $HEADER && 
-           m=^\s*Top\s+(<b>)?\d+(</b>)?\s*(Web\s+Site)?$=)
-      {
-      # Actual line of input is:
-      # Top <b>30</b>
-      # Top 50 Web Site
-      print STDERR "header line (no count)\n" if 2 <= $self->{'_debug'};
       $state = $HITS;
       } # we're in HEADER mode, and line has number of results
 
@@ -345,12 +339,12 @@ sub native_retrieve_some
       $state = $HITS;
       } # line is description
 
-    elsif ($state eq $HITS &&
-           m/>\s*Show Titles Only\s*</i)
-      {
-      print STDERR " end of URL list\n" if 2 <= $self->{'_debug'};
-      $state = $TRAILER;
-      }
+    # elsif ($state eq $HITS &&
+    #        m/>\s*Show Titles Only\s*</i)
+    #   {
+    #   print STDERR " end of URL list\n" if 2 <= $self->{'_debug'};
+    #   $state = $TRAILER;
+    #   }
     elsif ((($state eq $HITS) || ($state eq $TRAILER)) &&
            m/<INPUT\s[^>]*VALUE=\"Next\sResults\"/i)
       {

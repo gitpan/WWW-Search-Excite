@@ -1,3 +1,19 @@
+2000-09-19
+
+	* VERSION 2.12 RELEASED
+	
+2000-09-18  Kingpin  <mthurn@tasc.com>
+
+	* Excite.pm (native_retrieve_some): parse new output format
+
+2000-09-07
+	
+	* Excite.pm (native_retrieve_some): parse result count
+	
+2000-09-06
+	
+	* VERSION 2.11 RELEASED
+	
 2000-09-05  Kingpin  <mthurn@tasc.com>
 
 	* Excite.pm (native_retrieve_some): parse new excite.com headers
