@@ -1,0 +1,20 @@
+#!/usr/local/bin/perl -w
+
+use WWW::Search;
+use WWW::Search::Test;
+
+my $sEngine = shift;
+my $oSearch = new WWW::Search($sEngine);
+my $oTest = new WWW::Search::Test($sEngine);
+
+open TEST, "<test.pl" or die $!;
+my @asTest = <TEST>;
+close TEST;
+my @asCode = grep { /\055\076test\050/ } @asTest;
+$oTest->mode($MODE_UPDATE);
+# $oTest->{debug} = 1;
+# $oTest->{verbose} = 1;
+my $sCode = join(' ', @asCode);
+# print STDERR " + asCode is >>>$sCode<<<\n";
+my $MAINTAINER = $oSearch->maintainer;
+eval $sCode;

@@ -1,7 +1,7 @@
 # Excite.pm
 # by Martin Thurn
 # Copyright (C) 1998 by USC/ISI
-# $Id: Excite.pm,v 1.16 2000/01/28 19:17:48 mthurn Exp $
+# $Id: Excite.pm,v 1.17 2000/02/15 17:20:20 mthurn Exp $
 
 =head1 NAME
 
@@ -63,6 +63,11 @@ MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 
 =head1 VERSION HISTORY
 
+=head2 2.05, 2000-02-08
+
+testing now uses WWW::Search::Test module;
+www.excite.com only allows (up to) 50 per page (and no odd numbers) 
+
 =head2 2.04, 2000-01-28
 
 www.excite.com changed their output format slightly
@@ -70,7 +75,7 @@ www.excite.com changed their output format slightly
 =head2 2.03, 1999-10-20
 
 www.excite.com changed their output format slightly;
-new uses strip_tags() on title and description results
+use strip_tags() on title and description results
 
 =head2 2.02, 1999-10-05
 
@@ -116,18 +121,13 @@ require Exporter;
 @EXPORT = qw();
 @EXPORT_OK = qw();
 @ISA = qw(WWW::Search Exporter);
-$VERSION = '2.04';
 
 use Carp ();
 use WWW::Search qw( generic_option strip_tags );
 require WWW::SearchResult;
 
+$VERSION = '2.05';
 $MAINTAINER = 'Martin Thurn <MartinThurn@iname.com>';
-$TEST_CASES = <<"ENDTESTCASES";
-&test('Excite', '$MAINTAINER', 'zero', \$bogus_query, \$TEST_EXACTLY);
-&test('Excite', '$MAINTAINER', 'one_page', '+L'.'S'.'A'.'M +replic'.'ation', \$TEST_RANGE, 2,49);
-&test('Excite', '$MAINTAINER', 'two_page', 'bundu'.'ki', \$TEST_GREATER_THAN, 51);
-ENDTESTCASES
 
 # private
 sub native_setup_search
@@ -139,23 +139,9 @@ sub native_setup_search
   $self->{_debug} = 2 if ($native_options_ref->{'search_parse_debug'});
   $self->{_debug} ||= 0;
 
-  my $DEFAULT_HITS_PER_PAGE = 100;
-  $DEFAULT_HITS_PER_PAGE = 30 if $self->{_debug};
+  my $DEFAULT_HITS_PER_PAGE = 50;
+  # $DEFAULT_HITS_PER_PAGE = 30 if $self->{_debug};
   $self->{'_hits_per_page'} = $DEFAULT_HITS_PER_PAGE;
-
-  # Add one to the number of hits needed, because Search.pm does ">"
-  # instead of ">=" on line 672!
-  my $iMaximum = 1 + $self->maximum_to_retrieve;
-  # Divide the problem into N pages of K hits per page.
-  my $iNumPages = 1 + int($iMaximum / $self->{'_hits_per_page'});
-  if (1 < $iNumPages)
-    {
-    $self->{'_hits_per_page'} = 1 + int($iMaximum / $iNumPages);
-    }
-  else
-    {
-    $self->{'_hits_per_page'} = $iMaximum;
-    }
 
   $self->{agent_e_mail} = 'MartinThurn@iname.com';
   $self->user_agent(0);
