@@ -1,3 +1,13 @@
+2000-05-26  Kingpin  <mthurn@tasc.com>
+
+	* Excite.pm: make sure summaries are on (but parse correctly even if they're not)
+	
+	* Excite.pm: excite.com does not report score any more
+
+2000-05-22  Kingpin  <mthurn@tasc.com>
+
+	* test.pl: new test cases
+
 2000-04-03  Kingpin  <mthurn@tasc.com>
 
 	* VERSION 2.07 RELEASED

@@ -1,7 +1,7 @@
 # Excite.pm
 # by Martin Thurn
 # Copyright (C) 1998 by USC/ISI
-# $Id: Excite.pm,v 1.21 2000/03/29 21:06:10 mthurn Exp $
+# $Id: Excite.pm,v 1.23 2000/05/27 03:07:17 mthurn Exp $
 
 =head1 NAME
 
@@ -134,7 +134,7 @@ use Carp ();
 use WWW::Search qw( generic_option strip_tags );
 require WWW::SearchResult;
 
-$VERSION = '2.07';
+$VERSION = '2.08';
 $MAINTAINER = 'Martin Thurn <MartinThurn@iname.com>';
 
 # private
@@ -174,7 +174,8 @@ sub native_setup_search
                          'perPage' => $self->{'_hits_per_page'},
                          'showSummary' => 'true',
                          'start' => $self->{'_next_to_retrieve'},
-                         'search' => $native_query,
+                         's' => $native_query,
+                         'c' => 'web',
                         };
     } # if
   my $options_ref = $self->{_options};
@@ -260,30 +261,36 @@ sub native_retrieve_some
       print STDERR "hit percentage line\n" if 2 <= $self->{'_debug'};
       # Actual line of input:
       # <SMALL>92% </SMALL>
+      $hit->score($1);
+      $state = $URL;
+      } # in HITS mode, saw percentage line
+
+    elsif ($state eq $HITS && 
+           m!\A(?:<p>\s*)?\<A\s+HREF=\"[^\";]+?;([^\"]+)\">([^\<]+)!i)
+      {
+      print STDERR "hit url line\n" if 2 <= $self->{'_debug'};
+      # Actual line of input:
+      # <A HREF="http://buteo.colorado.edu/~yosh/psi/system2/aliens/greedo/">Greedo</A>&nbsp;
+      # <p> <A HREF="http://search.excite.com/relocate/sr=webresult|ss=pikamew|id=1265183;http://www.geocities.com/TimesSquare/Corridor/2509/geobook.html">Charmeleon's Guestbook</A>&nbsp;
+      # Sometimes the </A> is on the next line.
+      # Sometimes there is a /r right before the </A>
       if (ref($hit) && $hit->url)
         {
         push(@{$self->{cache}}, $hit);
         }
       $hit = new WWW::SearchResult;
-      $hit->score($1);
       $self->{'_num_hits'}++;
       $hits_found++;
-      $state = $URL;
-      } # in HITS mode, saw percentage line
-
-    elsif ($state eq $URL && 
-           m!\A\<A\s+HREF=\"[^\";]+?;([^\"]+)\">([^\<]+)!i)
-      {
-      print STDERR "hit url line\n" if 2 <= $self->{'_debug'};
-      # Actual line of input:
-      # <A HREF="http://buteo.colorado.edu/~yosh/psi/system2/aliens/greedo/">Greedo</A>&nbsp;
-      # Sometimes the </A> is on the next line.
-      # Sometimes there is a /r right before the </A>
       $hit->add_url($1);
       $hit->title(strip_tags($2));
       $state = $DESC;
       }
 
+    elsif ($state eq $DESC && m/^<BR>$/)
+      {
+      print STDERR "no desc\n" if 2 <= $self->{'_debug'};
+      $state = $HITS;
+      }
     elsif ($state eq $DESC &&
            (m/^\-\s(.+?)<BR>/ || m/^\-\s(.+)$/)
           )

@@ -8,7 +8,8 @@ use ExtUtils::testlib;
 # Change 1..1 below to 1..last_test_to_print .
 # (It may become useful if the test is moved to ./t subdirectory.)
 
-BEGIN { $| = 1; print "1..6\n"; }
+# 6 tests without "goto MULTI_RESULT"
+BEGIN { $| = 1; print "1..5\n"; }
 END {print "not ok 1\n" unless $loaded;}
 use WWW::Search::Excite;
 $loaded = 1;
@@ -42,28 +43,32 @@ print "ok $iTest\n";
 
 # This query returns 1 page of results:
 $iTest++;
-$oSearch->native_query(WWW::Search::escape_query('+LS'.'AM +replic'.'ation'),
+my $sQuery = '+LS'.'AM +replic'.'ation';
+$oSearch->native_query(WWW::Search::escape_query($sQuery),
                          { 'search_debug' => $debug, },
                       );
 @aoResults = $oSearch->results();
 $iResults = scalar(@aoResults);
 if (($iResults < 2) || (49 < $iResults))
   {
-  print STDERR " --- got $iResults results for '+LS","AM +replic","ation', but expected 2..49\n";
+  print STDERR " --- got $iResults results for $sQuery, but expected 2..49\n";
   print STDOUT 'not ';
   }
 print "ok $iTest\n";
 
+goto MULTI_RESULT;
+
 # This query returns 2 pages of results:
 $iTest++;
-$oSearch->native_query(WWW::Search::escape_query('+Thu'.'rn +topp'.'s'),
+$sQuery = 'pikamew';
+$oSearch->native_query(WWW::Search::escape_query($sQuery),
                          { 'search_debug' => $debug, },
                       );
 @aoResults = $oSearch->results();
 $iResults = scalar(@aoResults);
 if (($iResults < 51) || (99 < $iResults))
   {
-  print STDERR " --- got $iResults results for '+Thu","rn +to","pps', but expected 51..99\n";
+  print STDERR " --- got $iResults results for $sQuery, but expected 51..99\n";
   print STDOUT 'not ';
   }
 print "ok $iTest\n";
@@ -73,7 +78,8 @@ MULTI_RESULT:
 
 # This query returns 3 pages of results:
 $iTest++;
-$oSearch->native_query('bundu'.'ki',
+$sQuery = 'pikachu';
+$oSearch->native_query($sQuery,
                          { 'search_debug' => $debug, },
                       );
 $oSearch->maximum_to_retrieve(129);
@@ -81,7 +87,7 @@ $oSearch->maximum_to_retrieve(129);
 $iResults = scalar(@aoResults);
 if ($iResults < 101)
   {
-  print STDERR " --- got $iResults results for 'bundu","ki', but expected > 101\n";
+  print STDERR " --- got $iResults results for $sQuery, but expected > 101\n";
   print STDOUT 'not ';
   }
 print "ok $iTest\n";
