@@ -1,7 +1,7 @@
 # Excite.pm
 # by Martin Thurn
 # Copyright (C) 1998 by USC/ISI
-# $Id: Excite.pm,v 1.33 2001/05/17 14:17:36 mthurn Exp $
+# $Id: Excite.pm,v 1.34 2001/08/29 14:51:49 mthurn Exp mthurn $
 
 =head1 NAME
 
@@ -26,8 +26,6 @@ This class exports no public interface; all interaction should
 be done through L<WWW::Search> objects.
 
 =head1 NOTES
-
-www.excite.com does not report the approximate result count.
 
 =head1 SEE ALSO
 
@@ -57,6 +55,10 @@ WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
 MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 
 =head1 VERSION HISTORY
+
+=head2 2.19, 2001-08-29
+
+Handle yet another new output format
 
 =head2 2.17, 2001-05-17
 
@@ -158,13 +160,17 @@ use HTML::TreeBuilder;
 use WWW::Search qw( generic_option strip_tags );
 require WWW::SearchResult;
 
-$VERSION = '2.18';
+use strict;
+use vars qw( $VERSION $MAINTAINER );
+
+$VERSION = '2.19';
 $MAINTAINER = 'Martin Thurn <MartinThurn@iname.com>';
 
 # private
 sub native_setup_search
   {
   my ($self, $native_query, $native_options_ref) = @_;
+  my $hits_found = 0;
 
   # Set some private variables:
   $self->{_debug} = $native_options_ref->{'search_debug'};
@@ -221,6 +227,7 @@ sub native_setup_search
 sub native_retrieve_some
   {
   my ($self) = @_;
+  my $hits_found = 0;
 
   # Fast exit if already done:
   return undef unless defined($self->{_next_url});
@@ -229,7 +236,7 @@ sub native_retrieve_some
   $self->user_agent_delay if 1 < $self->{'_next_to_retrieve'};
 
   # Get some results, adhering to the WWW::Search mechanism:
-  print STDERR " *   sending request (",$self->{_next_url},")\n" if $self->{'_debug'};
+  print STDERR " +   sending request (",$self->{_next_url},")\n" if $self->{'_debug'};
   my $response = $self->http_request('GET', $self->{_next_url});
   $self->{response} = $response;
   unless ($response->is_success)
@@ -246,23 +253,56 @@ sub native_retrieve_some
   $tree->parse($response->content);
   $tree->eof;
 
+  # Look for the result count:
+  my @aoTD = $tree->look_down('_tag', 'td');
+ TD:
+  foreach my $oTD (@aoTD)
+    {
+    next unless ref $oTD;
+    my $sTD = $oTD->as_text;
+    # Actual TD tag as of 2001-08-29:
+    # <td>Top 50 of about 476,915 found in <font color=#990000><b>Web Sites</b></font> for: <b>Martin Thurn</b></td>
+    if ($sTD =~ m!\d of (?:about )?([\d,]+) found!)
+      {
+      my $sCount = $1;
+      $sCount =~ s!,!!g;
+      $self->approximate_result_count($sCount);
+      last TD;
+      } # if
+    } # foreach
+
   # Each URL result is in a <LI> tag:
   my @aoLI = $tree->look_down('_tag', 'li');
+ LI:
   foreach my $oLI (@aoLI)
     {
+    # Actual LI contents, 2001-08-29:
+    # <li><a href="/r/sr=webresult|ss=%22Martin+Thurn%22|c=enus|id=21279083|pos=49;http://www.toymania.com/news/news11_97.shtml" onmouseout="window.status=('');return true" onmouseover="window.status=('http://www.toymania.com/news/news11_97.shtml');return true">Past News and Pictures from the Raving Toy Maniac</a><br> Exclusive Puppetmaster Figures Hot on the heels of the release of the regular Puppetmaster figures from Full Moon Toys, Troll and Toad has announced their release of excluisve, limited edition var...<br><nobr><span class="size8">http://www.toymania.com/news/news11_97.shtml</span> &nbsp; <span class="size8">[<a href="/r/co=xsr_collapse_host;http://search.excite.com/search.gw?search=%22Martin+Thurn%22+site:www.toymania.com">more from this site</a>]</span><br></nobr>
+
     print STDERR " + LI == ", $oLI->as_HTML if 1 < $self->{'_debug'};
     my $oA = $oLI->look_down('_tag', 'a');
     next unless ref($oA);
     my $sURL = $oA->attr('href');
-    $sURL =~ s!\A.+?;pos=\d+;!!;
+    $sURL =~ s!\A.+?pos=\d+;!!;
     # print STDERR " +   URL   == $sURL\n" if 1 < $self->{'_debug'};
     my $sTitle = $oA->as_text;
+    # Delete tree portion, so the title does not get attached to the
+    # description:
+    $oA->detach;
+    $oA->delete;
     # print STDERR " +   TITLE == $sTitle\n" if 1 < $self->{'_debug'};
-    # The last <span> tag contains the description:
-    my @aoFONT = $oLI->look_down('_tag', 'span');
-    $oFONT = $aoFONT[-1];
-    next unless ref($oFONT);
-    my $sDesc = $oFONT->as_text;
+    my @aoSPAN = $oLI->look_down('_tag', 'span');
+    # Throw away the last <span> tag:
+    my $oSPAN = pop @aoSPAN;
+    next unless ref $oSPAN;
+    $oSPAN->detach;
+    $oSPAN->delete;
+    # The first span is an abbreviated URL:
+    $oSPAN = shift @aoSPAN;
+    next unless ref $oSPAN;
+    $oSPAN->detach;
+    $oSPAN->delete;
+    my $sDesc = $oLI->as_text;
     # print STDERR " +   DESC  == $sDesc\n" if 1 < $self->{'_debug'};
     my $hit = new WWW::SearchResult;
     $hit->add_url($sURL);
@@ -281,16 +321,17 @@ sub native_retrieve_some
     {
     next unless ref $oSPAN;
     my $sSPAN = $oSPAN->as_HTML;
-    print STDERR " +   SPAN  == $sSPAN\n" if 1 < $self->{'_debug'};
     my @aoA = $oSPAN->look_down('_tag', 'a');
     # The NEXT PAGE link is the last one on the line:
     my $oA = pop @aoA;
     next SPAN unless ref $oA;
     my $sA = $oA->as_text;
+    # print STDERR " +   SPAN  == $sSPAN\n" if 1 < $self->{'_debug'};
     print STDERR " +   A     == $sA\n" if 1 < $self->{'_debug'};
     if ($sA =~ m!next page!i)
       {
       $self->{_next_url} = new $HTTP::URI_CLASS($oA->attr('href'));
+      print STDERR " +   mtr   == ", $self->maximum_to_retrieve, "\n" if 1 < $self->{'_debug'};
       last SPAN;
       } # if
     } # foreach $oSPAN

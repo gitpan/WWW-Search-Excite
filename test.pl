@@ -2,6 +2,7 @@
 # `make test'. After `make install' it should work as `perl test.pl'
 
 use ExtUtils::testlib;
+use WWW::Search::Test qw( new_engine run_test );
 
 ######################### We start with some black magic to print on failure.
 
@@ -21,73 +22,25 @@ print "ok 1\n";
 # (correspondingly "not ok 13") depending on the success of chunk 13
 # of the test code):
 
-my $iTest = 2;
+$WWW::Search::Test::iTest = 1;
 
-my $sEngine = 'Excite';
-my $oSearch = new WWW::Search($sEngine);
-print ref($oSearch) ? '' : 'not ';
-print "ok $iTest\n";
-
-use WWW::Search::Test;
+&new_engine('Excite');
 my $debug = 0;
-
-# This test returns no results (but we should not get an HTTP error):
-$iTest++;
-$oSearch->native_query($WWW::Search::Test::bogus_query);
-@aoResults = $oSearch->results();
-$iResults = scalar(@aoResults);
-print STDOUT (0 < $iResults) ? 'not ' : '';
-print "ok $iTest\n";
 
 # goto MULTI_RESULT;
 
-# This query returns 1 page of results:
-$iTest++;
-my $sQuery = '+LS'.'AM +replic'.'ation';
-$oSearch->native_query(WWW::Search::escape_query($sQuery),
-                         { 'search_debug' => $debug, },
-                      );
-@aoResults = $oSearch->results();
-$iResults = scalar(@aoResults);
-if (($iResults < 2) || (49 < $iResults))
-  {
-  print STDERR " --- got $iResults results for $sQuery, but expected 2..49\n";
-  print STDOUT 'not ';
-  }
-print "ok $iTest\n";
+# This test returns no results (but we should not get an HTTP error):
+&run_test($WWW::Search::Test::bogus_query, 0, 0, $debug);
 
-goto MULTI_RESULT;
+# This query returns 1 page of results:
+&run_test('+LS'.'AM +replic'.'ation', 1, 49, $debug);
 
 # This query returns 2 pages of results:
-$iTest++;
-$sQuery = 'li'.'zardon';
-$oSearch->native_query(WWW::Search::escape_query($sQuery),
-                         { 'search_debug' => $debug, },
-                      );
-@aoResults = $oSearch->results();
-$iResults = scalar(@aoResults);
-if (($iResults < 51) || (99 < $iResults))
-  {
-  print STDERR " --- got $iResults results for $sQuery, but expected 51..99\n";
-  print STDOUT 'not ';
-  }
-print "ok $iTest\n";
+&run_test('"Star Wars B'.'ible"', 51, 99, $debug);
 
 MULTI_RESULT:
-# $debug = 1;
+# $debug = 2;
+# $WWW::Search::Test::oSearch->{debug} = 1;
 
-# This query returns 3 pages of results:
-$iTest++;
-$sQuery = 'pikamew';
-$oSearch->native_query($sQuery,
-                         { 'search_debug' => $debug, },
-                      );
-# $oSearch->maximum_to_retrieve(129);
-@aoResults = $oSearch->results();
-$iResults = scalar(@aoResults);
-if ($iResults < 101)
-  {
-  print STDERR " --- got $iResults results for $sQuery, but expected > 101\n";
-  print STDOUT 'not ';
-  }
-print "ok $iTest\n";
+# This query returns 3 (or more) pages of results:
+&run_test('Ma'.'rtin', 101, undef, $debug);

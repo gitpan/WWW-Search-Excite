@@ -4,7 +4,7 @@ This is a backend for use with the WWW::Search module.
 Please read the README for WWW::Search for general information.
 
 (One place to find it is
-http://www.perl.com/CPAN-local/modules/by-module/WWW/WWW-Search-2.14.readme
+http://www.perl.com/CPAN-local/modules/by-module/WWW/WWW-Search-2.21.readme
 )
 
 Read the ChangeLog file in this distribution to see what is new with

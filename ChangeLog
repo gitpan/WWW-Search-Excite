@@ -1,3 +1,7 @@
+2001-08-29  Kingpin  <mthurn@tasc.com>
+
+	* Excite.pm (native_retrieve_some): Handle new output format
+
 2000-05-18  Kingpin  <mthurn@tasc.com>
 
 	* VERSION 2.18 RELEASED
